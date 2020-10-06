@@ -1,62 +1,30 @@
+const express = require("express");
 const cors = require('cors');
-const express = require('express');
-const stripe = require('stripe')('sk_test_51HO0KCESOl6tMOVpp2c81gag8m1uxOxbYBLzYxpLc6DWl4r2FwcVE5QDuWNYXar7MSqBj4dbG1Tfapj1FQIJ0lGp00m8KFS3ZQ');
 
 const { v4: uuidv4 } = require('uuid');
 const app = express();
-
-app.use(express.json());
 app.use(cors());
 
-
-app.get('/', (req, res) => {
-    res.send('Hello world');
-});
-
-
-app.post('/payment', (req, res) => {
-    const {product, token} = req.body;
-    console.log("PRODUCT ", product);
-    console.log("PRICE ", product.price);
-    const idempotencyKey = uuidv4();
-
-    return stripe.customers.create({
-        email: token.email,
-        source: token.id
-    }).then(customer => {
-        stripe.charges.create({
-            amount: product.price * 100,
-            currency: 'usd',
-            customer: customer.id,
-            reciept_email: token.email,
-            description: 'product desc'
-        },{idempotencyKey})
-        .then(result => res.status(200).json(result))
-        .catch(err => console.log(err))
-    })
-});
-
-app.post('/create-checkout-session', async (req, res) => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'inr',
-            product_data: {
-              name: 'T-shirt',
-            },
-            unit_amount: 2000,
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: 'http://localhost:4200/',
-      cancel_url: 'http://localhost:4200/',
-    });
-  console.log(session);
-    res.json({ id: session.id });
+const { resolve } = require("path");
+// This is your real test secret API key.
+const stripe = require("stripe")("sk_test_51HO0KCESOl6tMOVpp2c81gag8m1uxOxbYBLzYxpLc6DWl4r2FwcVE5QDuWNYXar7MSqBj4dbG1Tfapj1FQIJ0lGp00m8KFS3ZQ");
+app.use(express.static("."));
+app.use(express.json());
+const calculateOrderAmount = items => {
+  // Replace this constant with a calculation of the order's amount
+  // Calculate the order total on the server to prevent
+  // people from directly manipulating the amount on the client
+  return 1400;
+};
+app.post("/create-payment-intent", async (req, res) => {
+  const { items } = req.body;
+  // Create a PaymentIntent with the order amount and currency
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: calculateOrderAmount(items),
+    currency: "inr"
   });
-
-app.listen(3000, () => console.log('Listening on port 3000'));
+  res.send({
+    clientSecret: paymentIntent.client_secret
+  });
+});
+app.listen(4242, () => console.log('Node server listening on port 4242!'));
